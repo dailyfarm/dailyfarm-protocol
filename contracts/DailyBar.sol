@@ -9,12 +9,16 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 // DailyBar is the coolest bar in town. You come in with some Daily, and leave with more! The longer you stay, the more Daily you get.
 //
 // This contract handles swapping to and from xDaily, DailySwap's staking token.
-contract DailyBar is ERC20("DailyBar", "xDAILY"){
+contract DailyBar is ERC20{
     using SafeMath for uint256;
     IERC20 public daily;
 
     // Define the Daily token contract
-    constructor(IERC20 _daily) public {
+    constructor(
+        IERC20 _daily, 
+        string memory _name, 
+        string memory _symbol
+    ) public ERC20(_name, _symbol) {
         daily = _daily;
     }
 
