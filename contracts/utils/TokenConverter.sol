@@ -48,7 +48,9 @@ contract TokenConverter {
         uint256 amountIn,
         address to
     ) internal returns (uint256 amountOut) {
-
+        if (amountIn == 0) {
+            return 0;
+        }
         IUniswapV2Pair pair =
             IUniswapV2Pair(factory.getPair(fromToken, toToken));
         require(address(pair) != address(0), "TokenConverter: Cannot convert");
