@@ -10,8 +10,6 @@ import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./interfaces/IMinter.sol";
-import "./interfaces/IRewardLocker.sol";
-import "./interfaces/IFeeReceiver.sol";
 
 // MasterChef is the master of Reward. He can make Reward and he is a fair guy.
 //
@@ -28,8 +26,6 @@ contract MasterChef is Ownable {
         uint256 amount; // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
         address fundedBy; // funded by
-        uint256 locktime; // locktime
-        uint256 lastRewardTime; // last reward timestamp, used for calc lock amount
         //
         // We do some fancy math here. Basically, any point in time, the amount of REWARDs
         // entitled to a user but is pending to be distributed is:
@@ -48,15 +44,12 @@ contract MasterChef is Ownable {
         uint256 allocPoint; // How many allocation points assigned to this pool. REWARDs to distribute per block.
         uint256 lastRewardTimestamp; // Last block number that REWARDs distribution occurs.
         uint256 accRewardPerShare; // Accumulated REWARDs per share, times 1e12. See below.
-        uint256 lockPeriod;
-        address rewardLocker;
-        address feeReceiver;
     }
     // The REWARD TOKEN!
     IERC20 public reward;
     // DEV and OPERATION FUND
-    uint256 public constant DEV_FUND_RATE = 20;
-    uint256 public constant OP_FUND_RATE = 10;
+    uint256 public constant DEV_FUND_RATE = 15;
+    uint256 public constant OP_FUND_RATE = 5;
     // Dev address.
     address public devaddr;
     // Dev balance
@@ -108,9 +101,6 @@ contract MasterChef is Ownable {
     function add(
         uint256 _allocPoint,
         IERC20 _lpToken,
-        uint256 _lockPeriod,
-        address _rewardLocker,
-        address _feeReceiver,
         uint256 _starttime,
         bool _withUpdate
     ) public onlyOwner {
@@ -124,10 +114,7 @@ contract MasterChef is Ownable {
                 lpToken: _lpToken,
                 allocPoint: _allocPoint,
                 lastRewardTimestamp: _starttime,
-                accRewardPerShare: 0,
-                lockPeriod: _lockPeriod,
-                rewardLocker: _rewardLocker,
-                feeReceiver: _feeReceiver
+                accRewardPerShare: 0
             })
         );
     }
@@ -146,18 +133,6 @@ contract MasterChef is Ownable {
             _allocPoint
         );
         poolInfo[_pid].allocPoint = _allocPoint;
-    }
-
-    function setLockPeriod(uint256 _pid, uint256 _lockPeriod) public onlyOwner {
-        poolInfo[_pid].lockPeriod = _lockPeriod;
-    }
-
-    function setRewardLocker(uint256 _pid, address _rewardLocker) public onlyOwner {
-        poolInfo[_pid].rewardLocker = _rewardLocker;
-    }
-
-    function setFeeReceiver(uint256 _pid, address _feeReceiver) public onlyOwner {
-        poolInfo[_pid].feeReceiver = _feeReceiver;
     }
 
     function setNextRewardRate(uint256 _time, uint256 _rate) public onlyOwner {
@@ -269,17 +244,8 @@ contract MasterChef is Ownable {
         if (user.fundedBy == address(0)) user.fundedBy = msg.sender;
         pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
         
-        uint256 depositAmount = _amount;
-        if (pool.feeReceiver != address(0)) {
-            uint256 fee = IFeeReceiver(pool.feeReceiver).getDepositFeeRate(msg.sender, depositAmount);
-            if (fee > 0) {
-                pool.lpToken.safeTransfer(pool.feeReceiver, fee);
-                IFeeReceiver(pool.feeReceiver).notifyFee(address(pool.lpToken), fee);    
-            }
-        }
-        user.amount = user.amount.add(depositAmount);
+        user.amount = user.amount.add(_amount);
         user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e12);
-        user.locktime = block.timestamp;
         
         emit Deposit(msg.sender, _pid, _amount);
     }
@@ -298,21 +264,12 @@ contract MasterChef is Ownable {
         UserInfo storage user = userInfo[_pid][_for];
         require(user.fundedBy == msg.sender, "only funder");
         require(user.amount >= _amount, "withdraw: not good");
-        require(_amount == 0 || user.locktime.add(pool.lockPeriod) <= block.timestamp, "lock");
         updatePool(_pid);
         _harvest(_for, _pid);
         user.amount = user.amount.sub(_amount);
         user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e12);
 
-        uint256 withdrawAmount = _amount;
-        if (pool.feeReceiver != address(0)) {
-            uint256 fee = IFeeReceiver(pool.feeReceiver).getWithdrawFeeRate(msg.sender, withdrawAmount);
-            if (fee > 0) {
-                pool.lpToken.safeTransfer(pool.feeReceiver, fee);
-                IFeeReceiver(pool.feeReceiver).notifyFee(address(pool.lpToken), fee);    
-            }
-        }
-        pool.lpToken.safeTransfer(address(msg.sender), withdrawAmount);
+        pool.lpToken.safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _pid, user.amount);
     }
 
@@ -331,27 +288,8 @@ contract MasterChef is Ownable {
         require(user.amount > 0, "nothing to harvest");
         uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e12).sub(user.rewardDebt);
         require(pending <= reward.balanceOf(address(this)), "wtf not enough reward");
-        if (pool.rewardLocker != address(0)) {
-            uint256 rewardtime = user.lastRewardTime > 0 ? user.lastRewardTime : user.locktime;
-            uint256 lockAmount = IRewardLocker(pool.rewardLocker).getLockAmount(
-                msg.sender, 
-                rewardtime,
-                pending);
-            if (lockAmount > 0) {
-                reward.safeApprove(pool.rewardLocker, lockAmount);
-                IRewardLocker(pool.rewardLocker).lock(
-                    msg.sender,
-                    rewardtime, 
-                    lockAmount);
-                reward.safeApprove(pool.rewardLocker, 0);
-                pending = pending.sub(lockAmount);
-            }
-        }
-        safeRewardTransfer(_to, pending); 
-        user.lastRewardTime = block.timestamp;       
+        safeRewardTransfer(_to, pending);        
     }
-
-
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw(uint256 _pid) public {

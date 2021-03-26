@@ -9,12 +9,15 @@ contract DailyToken is ERC20, Ownable {
     mapping (address => bool) public minters;
     uint256 public mintersCount;
 
+    address public emergencyOperator;
+
     constructor(
         string memory name, 
         string memory symbol,
         uint256 mintAmount
     ) public ERC20(name, symbol) {
         _mint(msg.sender, mintAmount);
+        emergencyOperator = msg.sender;
     }
 
     // =============== MODIFIER ======================
@@ -57,7 +60,17 @@ contract DailyToken is ERC20, Ownable {
         minters[_minter] = _set;
     }
 
-    
+    function setEmergencyOperator(address _op) public onlyOwner {
+        emergencyOperator = _op;
+    }
+
+    function emergencyRemoveMinter(address _minter) public {
+        require(msg.sender == emergencyOperator, "no operator");
+        if (minters[_minter]) {
+            minters[_minter] = false;
+            mintersCount = mintersCount.sub(1);
+        }
+    }
 
 }
 

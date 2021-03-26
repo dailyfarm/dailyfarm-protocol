@@ -1,7 +1,7 @@
 pragma solidity 0.6.12;
 
 interface IVault {
-    function harvest() external;
+    function reinvest() external;
 
     function deposit(uint256 amount) external;
     function withdraw(uint256 amount) external;

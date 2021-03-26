@@ -60,7 +60,7 @@ contract AlpacaWbnbLpVault is IVault, TokenConverter, ERC20("daily Alpaca_Wbnb_L
         _;
     }
 
-    function harvest() external override {
+    function reinvest() external override {
         _harvest();
     }
 

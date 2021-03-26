@@ -60,7 +60,7 @@ contract BeltWbnbLpVault is IVault, TokenConverter, ERC20("daily Belt_Wbnb_Lp", 
         _;
     }
 
-    function harvest() external override {
+    function reinvest() external override {
         _harvest();
     }
 
