@@ -1,172 +1,96 @@
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import '@openzeppelin/contracts/access/Ownable.sol';
-
 import "../interfaces/IMasterChef.sol";
-import "../interfaces/IVault.sol";
+import "./BaseVault.sol";
 import "../utils/TokenConverter.sol";
 
 
-contract AlpacaWbnbLpVault is IVault, TokenConverter, ERC20("daily Alpaca_Wbnb_Lp", "d_ALPACA_WBNB_LP"), Ownable {
+contract AlpacaWbnbLpVault is BaseVault, TokenConverter {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    address public lpToken;
-    address public alpaca;
-    address public wbnb;
+    address public constant lpToken = 0xF3CE6Aac24980E6B657926dfC79502Ae414d3083;
+    address public constant alpaca = 0x8F0528cE5eF7B51152A59745bEfDD91D97091d2F;
+    address public constant wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
-    address public farmer;
-    uint256 public farmerPid;
+    address public constant alpacaMasterChef = 0xA625AB01B08ce023B2a342Dbb12a16f2C8489A8F;
+    uint256 public constant alpacaMasterChefPid = 4;
 
-    address public dailyMasterChef;
-    uint256 public stakePid;
-
+    address public constant pancakeFactory = 0xBCfCcbde45cE874adCB698cC183deBcF17952812;
+    
+    address public dailyToken;
     address public feeReceiver;
 
-    address public emergencyOperator;
-    bool public emergencyStop; 
-
-    mapping(address => uint256) private _shareBalances;
-    
     constructor(
-        address _lpToken,
-        address _alpaca,
-        address _wbnb,
-        address _factory,
-        address _farmer,
-        uint256 _farmerPid,
         address _dailyMasterChef,
+        address _dailyToken,
         address _feeReceiver
-    ) public TokenConverter(_factory) {
-        lpToken = _lpToken;
-        alpaca = _alpaca;
-        wbnb = _wbnb;
-        farmer = _farmer;
-        farmerPid = _farmerPid;
-        dailyMasterChef = _dailyMasterChef;
+    ) 
+        public 
+        BaseVault(
+            "daily Alpaca_Wbnb_Lp",
+            "d_ALPACA_WBNB_LP",
+            lpToken,
+            _dailyMasterChef
+        )
+        TokenConverter(pancakeFactory) 
+    {
+        dailyToken = _dailyToken;
         feeReceiver = _feeReceiver;
-        emergencyOperator = msg.sender;
-        _approve(address(this), dailyMasterChef, 10**30);
-        IERC20(lpToken).safeApprove(farmer, 10**30);
+        IERC20(lpToken).safeApprove(alpacaMasterChef, 10**60);
     }
 
-    modifier onlyEmergencyOperator {
-        require (msg.sender == emergencyOperator, "on operator");
-
-        _;
-    }
-
-    function reinvest() external override {
-        _harvest();
-    }
-
-    function deposit(uint256 amount) external override {
-        require(!emergencyStop, "emergencyStop");
-        _harvest();
-        
-        uint256 shareAmount = amount;
-        if (totalSupply() > 0 && totalTokenBalance() > 0) {
-            shareAmount = amount.mul(totalSupply()).div(totalTokenBalance());
-        }
-        
-        _mint(address(this), shareAmount);
-        IMasterChef(dailyMasterChef).deposit(msg.sender, stakePid, shareAmount);
-        _shareBalances[msg.sender] = _shareBalances[msg.sender].add(shareAmount);
-        
-        IERC20(lpToken).safeTransferFrom(msg.sender, address(this), amount);
-        IAlpacaMasterChef(farmer).deposit(address(this), farmerPid, IERC20(lpToken).balanceOf(address(this)));
-    }
-
-    function withdraw(uint256 amount) public override {
-        _harvest();
-
-        uint256 shareAmount = amount.mul(totalShareBalance()).div(totalTokenBalance());
-        
-        IMasterChef(dailyMasterChef).withdraw(msg.sender, stakePid, shareAmount);
-        _shareBalances[msg.sender] = _shareBalances[msg.sender].sub(shareAmount);
-        _burn(address(this), shareAmount);
-
-        uint256 localBalance = IERC20(lpToken).balanceOf(address(this));
-        if (amount > localBalance) {
-            uint256 withdrawLpAmount = amount.sub(localBalance);
-            IAlpacaMasterChef(farmer).withdraw(address(this), farmerPid, withdrawLpAmount);
-        }
-        IERC20(lpToken).safeTransfer(msg.sender, amount);
-    }
-
-    function withdrawAll() external override {
-        withdraw(tokenBalanceOf(msg.sender));
-    }
-
-    function _harvest() internal {
-        (uint256 stakeAmount, , ,) = IAlpacaMasterChef(farmer).userInfo(farmerPid, address(this));
+    function _harvest() internal override {
+        (uint256 stakeAmount, , ,) = IAlpacaMasterChef(alpacaMasterChef).userInfo(alpacaMasterChefPid, address(this));
         if (stakeAmount > 0) {
-            IAlpacaMasterChef(farmer).harvest(farmerPid);
+            IAlpacaMasterChef(alpacaMasterChef).harvest(alpacaMasterChefPid);
         }
         uint256 alpacaAmount = IERC20(alpaca).balanceOf(address(this));
         if (alpacaAmount > 0) {
-            uint256 wbnbAmount = IERC20(wbnb).balanceOf(address(this));
-            if (wbnbAmount > 0) {
-                _addLp(alpaca, wbnb, alpacaAmount, wbnbAmount, address(this));
-            }
-            alpacaAmount = IERC20(alpaca).balanceOf(address(this));
+            // 10% for xDaily stakers
+            uint256 xReward = alpacaAmount.div(10);
+            _swap(alpaca, wbnb, xReward, address(this));
+            _swap(wbnb, dailyToken, IERC20(wbnb).balanceOf(address(this)), feeReceiver);
+
+            alpacaAmount = alpacaAmount.sub(xReward);
             _swap(alpaca, wbnb, alpacaAmount.div(2), address(this));
-            _addLp(alpaca, wbnb, IERC20(alpaca).balanceOf(address(this)), IERC20(wbnb).balanceOf(address(this)), address(this));
-        }
-
-        if (!emergencyStop) {
-            uint256 lpAmount = IERC20(lpToken).balanceOf(address(this));
-            if (lpAmount > 0) {
-                IERC20(lpToken).safeTransfer(feeReceiver, lpAmount.div(10));
-                IAlpacaMasterChef(farmer).deposit(address(this), farmerPid, IERC20(lpToken).balanceOf(address(this)));
-            }
+            _addLp(alpaca, wbnb, alpacaAmount.div(2), IERC20(wbnb).balanceOf(address(this)), address(this));
         }
     }
 
-    function setStakePid(uint256 _stakePid) public onlyOwner {
-        require(stakePid == 0, "already set");
-        stakePid = _stakePid;
+    function _invest() internal override {
+        uint256 lpAmount = IERC20(lpToken).balanceOf(address(this));
+        if (lpAmount > 0) {
+            IAlpacaMasterChef(alpacaMasterChef).deposit(address(this), alpacaMasterChefPid, lpAmount);
+        }
     }
 
-    function setFeeReceiver(address _feeReceiver) public onlyOwner {
-        feeReceiver = _feeReceiver;
+    function _exit() internal override {
+        IAlpacaMasterChef(alpacaMasterChef).withdrawAll(address(this), alpacaMasterChefPid);
     }
 
-    function setEmergencyOperator(address _op) public onlyOwner {
-        emergencyOperator = _op; 
+    function _exitSome(uint256 _amount) internal override {
+        IAlpacaMasterChef(alpacaMasterChef).withdraw(address(this), alpacaMasterChefPid, _amount);
     }
 
-    function stop() public onlyEmergencyOperator {
-        emergencyStop = true;
-        IERC20(lpToken).safeApprove(farmer, 0);
+    function _withdrawFee(uint256 _withdrawAmount, uint256 _lastDepositTime) internal override returns (uint256) {
+        if (_lastDepositTime.add(2 days) <= block.timestamp) {
+            return 0;
+        } 
+        uint256 feeAmount = _withdrawAmount.mul(2).div(1000);
+        
+        IERC20(lpToken).safeTransfer(lpToken, feeAmount);
+        IUniswapV2Pair(lpToken).burn(address(this));
+
+        _swap(alpaca, wbnb, IERC20(alpaca).balanceOf(address(this)), address(this));
+        _swap(wbnb, dailyToken, IERC20(wbnb).balanceOf(address(this)), feeReceiver);
     }
 
-    function start() public onlyEmergencyOperator {
-        emergencyStop = false;
-        IERC20(lpToken).safeApprove(farmer, 10**30);
+    function _totalTokenBalance() internal view override returns (uint256) {
+        (uint256 stakeAmount, , ,) = IAlpacaMasterChef(alpacaMasterChef).userInfo(alpacaMasterChefPid, address(this));
+        return IERC20(lpToken).balanceOf(address(this)).add(stakeAmount);
     }
-
-    function tokenBalanceOf(address user) public view override returns (uint256) {
-        return totalTokenBalance().mul(shareBalanceOf(user)).div(totalShareBalance());
-    }
-
-    function totalTokenBalance() public view override returns (uint256) {
-        (uint256 stakeAmount, , ,) = IAlpacaMasterChef(farmer).userInfo(farmerPid, address(this));
-        return stakeAmount.add(IERC20(lpToken).balanceOf(address(this))); 
-    }
-
-    function shareBalanceOf(address user) public view override returns (uint256) {
-        return _shareBalances[user];
-    }
-
-    function totalShareBalance() public view override returns (uint256) {
-        return totalSupply();
-    }
-
+    
 }
 
 

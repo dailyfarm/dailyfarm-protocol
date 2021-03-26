@@ -20,9 +20,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
     address public dailyMasterChef;
     uint256 public dailyStakePid;
 
-    address public feeReceiver;
-    uint256 public withdrawFeeFreePeriod;
-
     address public emergencyOperator;
     bool public emergencyStop;  // stop deposit and invest, can only withdraw
     bool public emergencyLock;  // stop deposit and withdraw, locked
@@ -34,14 +31,11 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
         string memory _name,
         string memory _symbol,
         address _wantToken,
-        address _dailyMasterChef,
-        address _feeReceiver
+        address _dailyMasterChef
     ) public ERC20(_name, _symbol) {
         wantToken = _wantToken;
         dailyMasterChef = _dailyMasterChef;
-        feeReceiver = _feeReceiver;
         emergencyOperator = msg.sender;
-        withdrawFeeFreePeriod = 2 days;
         _approve(address(this), dailyMasterChef, 10**60);
     }
 
@@ -63,13 +57,16 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
     function _invest() internal virtual;
     function _exit() internal virtual;
     function _exitSome(uint256 _amount) internal virtual;
-    function _totalTokenBalance() internal virtual view returns (uint256);
+    function _withdrawFee(uint256 _withdrawAmount, uint256 _lastDepositTime) internal virtual returns (uint256);
+    function _totalTokenBalance() internal view virtual returns (uint256);
 
     // =================  PUBLIC FUNCTIONs ===============
 
     function reinvest() external override {
         _harvest();
-        _invest();
+        if (!emergencyStop) {
+            _invest();
+        }
     }
 
     function deposit(uint256 amount) external override onlyEOA {
@@ -103,17 +100,12 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
         if (amount > localBalance) {
             uint256 withdrawAmount = amount.sub(localBalance);
             _exitSome(withdrawAmount);
-        } else {
+        } else if (!emergencyStop) {
             _invest();
         }
-        if (block.timestamp < withdrawFeeFreePeriod.add(lastDepositTimes[msg.sender])) {
-            uint256 withdrawFee = amount.mul(2).div(1000);
-            IERC20(wantToken).safeTransfer(feeReceiver, withdrawFee);
-            IERC20(wantToken).safeTransfer(msg.sender, amount.sub(withdrawFee));
-        } else {
-            IERC20(wantToken).safeTransfer(msg.sender, amount);
-        }
-        
+            
+        uint256 withdrawFee = _withdrawFee(amount, lastDepositTimes[msg.sender]);
+        IERC20(wantToken).safeTransfer(msg.sender, amount.sub(withdrawFee));        
     }
 
     function withdrawAll() external override onlyEOA {
@@ -124,14 +116,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
 
     function setDailyStakePid(uint256 _stakePid) public onlyOwner {
         dailyStakePid = _stakePid;
-    }
-
-    function setFeeReceiver(address _feeReceiver) public onlyOwner {
-        feeReceiver = _feeReceiver;
-    }
-
-    function setWithdrawFeeFreePeriod(uint256 _period) public onlyOwner {
-        withdrawFeeFreePeriod = _period;
     }
 
     function setEmergencyOperator(address _op) public onlyOwner {
