@@ -63,16 +63,12 @@ contract ThreeEpsVault is BaseVault, TokenConverter {
 
             epsAmount = epsAmount.sub(xReward);
             _swap(eps, wbnb, epsAmount, address(this));
-            uint256 wbnbAmount = IERC20(wbnb).balanceOf(address(this));
             
-            _swap(wbnb, busd, wbnbAmount.div(3), address(this));
-            _swap(wbnb, usdt, wbnbAmount.div(3), address(this));
-            _swap(wbnb, usdc, wbnbAmount.div(3), address(this));
+            uint256 wbnbAmount = IERC20(wbnb).balanceOf(address(this));            
+            _swap(wbnb, busd, wbnbAmount, address(this));
             
             uint256[] memory inAmounts = new uint256[](3);
             inAmounts[0] = IERC20(busd).balanceOf(address(this));
-            inAmounts[1] = IERC20(usdc).balanceOf(address(this));
-            inAmounts[2] = IERC20(usdt).balanceOf(address(this));
             IEpsStableSwap(epsStableSwap).add_liquidity(inAmounts, 1);
             
         }
