@@ -42,6 +42,9 @@ contract PancakeLpVault is BaseVault, TokenConverter {
         TokenConverter(pancakeFactory) 
     {
         lpToken = _lpToken;
+        address token0 = IUniswapV2Pair(lpToken).token0();
+        address token1 = IUniswapV2Pair(lpToken).token1();
+        require(token0 == wbnb || token1 == wbnb || token0 == busd || token1 == busd, "no valid lp");    
         cakeMasterChefPid = _cakeMasterChefPid;
         dailyToken = _dailyToken;
         feeReceiver = _feeReceiver;
@@ -64,21 +67,23 @@ contract PancakeLpVault is BaseVault, TokenConverter {
             
             address token0 = IUniswapV2Pair(lpToken).token0();
             address token1 = IUniswapV2Pair(lpToken).token1();
+            address fromToken = token0 == wbnb || token0 == busd ? token0 : token1;
+            address toToken = fromToken == token0 ? token1 : token0;
 
-            if (token0 == cake || token1 == cake) {
-                _swap(cake, wbnb, cakeAmount.div(2), address(this));
-                _addLp(cake, wbnb, cakeAmount.div(2), IERC20(wbnb).balanceOf(address(this)), address(this));
+
+            if (toToken == cake) {
+                _swap(cake, fromToken, cakeAmount.div(2), address(this));
             } else {
-                _swap(cake, token0, cakeAmount.div(2), address(this));
-                _swap(cake, token1, cakeAmount.div(2), address(this));
-                _addLp(
-                    token0, 
-                    token1, 
-                    IERC20(token0).balanceOf(address(this)),
-                    IERC20(token1).balanceOf(address(this)),
-                    address(this)
-                );
+                _swap(cake, fromToken, cakeAmount, address(this));
+                _swap(fromToken, toToken, IERC20(fromToken).balanceOf(address(this)).div(2), address(this));    
             }
+            _addLp(
+                token0, 
+                token1, 
+                IERC20(token0).balanceOf(address(this)),
+                IERC20(token1).balanceOf(address(this)),
+                address(this)
+            );
         }
     }
 
@@ -113,8 +118,8 @@ contract PancakeLpVault is BaseVault, TokenConverter {
         address fromToken = token0 == wbnb || token0 == busd ? token0 : token1;
         address toToken = fromToken == token0 ? token1 : token0;
 
-        _swap(fromToken, toToken, IERC20(fromToken).balanceOf(address(this)), address(this));
-        _swap(toToken, dailyToken, IERC20(wbnb).balanceOf(address(this)), feeReceiver);
+        _swap(toToken, fromToken, IERC20(toToken).balanceOf(address(this)), address(this));
+        _swap(fromToken, dailyToken, IERC20(fromToken).balanceOf(address(this)), feeReceiver);
 
     }
 
