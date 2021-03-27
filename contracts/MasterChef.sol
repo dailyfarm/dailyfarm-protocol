@@ -107,13 +107,12 @@ contract MasterChef is Ownable {
         if (_withUpdate) {
             massUpdatePools();
         }
-        require(_starttime >= block.timestamp, "starttime error");
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(
             PoolInfo({
                 lpToken: _lpToken,
                 allocPoint: _allocPoint,
-                lastRewardTimestamp: _starttime,
+                lastRewardTimestamp: _starttime > block.timestamp ? _starttime : block.timestamp,
                 accRewardPerShare: 0
             })
         );
