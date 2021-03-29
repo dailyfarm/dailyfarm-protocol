@@ -111,12 +111,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
         withdraw(tokenBalanceOf(msg.sender));
     }
 
-    function emergencyWithdraw() external onlyEOA {
-        require(emergencyStop, "not emergency");
-        require(_shareBalances[msg.sender] > 0, "no balance");
-        IERC20(wantToken).safeTransfer(msg.sender, tokenBalanceOf(msg.sender));
-    }
-
     // ============= GOV ===============================
 
     function setDailyStakePid(uint256 _stakePid) public onlyOwner {
@@ -136,10 +130,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
 
     function start() public virtual onlyEmergencyOperator {
         emergencyStop = false;
-    }
-
-    function exitInvest() public virtual onlyEmergencyOperator {
-        _exit();
     }
 
     // ===================== VIEW ========================== 
