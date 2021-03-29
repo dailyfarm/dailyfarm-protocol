@@ -83,6 +83,7 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
         _shareBalances[msg.sender] = _shareBalances[msg.sender].add(shareAmount);
         lastDepositTimes[msg.sender] = block.timestamp;
         
+        IERC20(wantToken).safeTransferFrom(msg.sender, address(this), amount);
         _invest();
     }
 
