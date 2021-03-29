@@ -22,7 +22,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
 
     address public emergencyOperator;
     bool public emergencyStop;  // stop deposit and invest, can only withdraw
-    bool public emergencyLock;  // stop deposit and withdraw, locked
 
     mapping(address => uint256) private _shareBalances;
     mapping(address => uint256) public lastDepositTimes;
@@ -88,7 +87,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
     }
 
     function withdraw(uint256 amount) public override onlyEOA {
-        require(!emergencyLock, "lock");
         _harvest();
 
         uint256 shareAmount = amount.mul(totalShareBalance()).div(_totalTokenBalance());
@@ -113,6 +111,12 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
         withdraw(tokenBalanceOf(msg.sender));
     }
 
+    function emergencyWithdraw() external onlyEOA {
+        require(emergencyStop, "not emergency");
+        require(_shareBalances[msg.sender] > 0, "no balance");
+        IERC20(wantToken).safeTransfer(msg.sender, tokenBalanceOf(msg.sender));
+    }
+
     // ============= GOV ===============================
 
     function setDailyStakePid(uint256 _stakePid) public onlyOwner {
@@ -127,24 +131,22 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
 
     function stop() public virtual onlyEmergencyOperator {
         emergencyStop = true;
+        _exit();
     }
 
     function start() public virtual onlyEmergencyOperator {
         emergencyStop = false;
     }
 
-    function lock() public virtual onlyEmergencyOperator {
-        emergencyStop = true;
-        emergencyLock = true;
+    function exitInvest() public virtual onlyEmergencyOperator {
         _exit();
-    }
-
-    function unlock() public virtual onlyEmergencyOperator {
-        emergencyLock = false;
     }
 
     // ===================== VIEW ========================== 
     function tokenBalanceOf(address user) public view override returns (uint256) {
+        if (totalSupply() == 0) {
+            return 0;
+        }
         return _totalTokenBalance().mul(shareBalanceOf(user)).div(totalShareBalance());
     }
 
