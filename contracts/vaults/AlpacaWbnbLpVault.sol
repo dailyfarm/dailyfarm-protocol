@@ -84,6 +84,7 @@ contract AlpacaWbnbLpVault is BaseVault, TokenConverter {
 
         _swap(alpaca, wbnb, IERC20(alpaca).balanceOf(address(this)), address(this));
         _swap(wbnb, dailyToken, IERC20(wbnb).balanceOf(address(this)), feeReceiver);
+        return feeAmount;
     }
 
     function _totalTokenBalance() internal view override returns (uint256) {

@@ -85,6 +85,7 @@ contract EpsWbnbLpVault is BaseVault, TokenConverter {
 
         _swap(eps, wbnb, IERC20(eps).balanceOf(address(this)), address(this));
         _swap(wbnb, dailyToken, IERC20(wbnb).balanceOf(address(this)), feeReceiver);
+        return feeAmount;
     }
 
     function _totalTokenBalance() internal view override returns (uint256) {

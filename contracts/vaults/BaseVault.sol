@@ -87,8 +87,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
     }
 
     function withdraw(uint256 amount) public override onlyEOA {
-        _harvest();
-
         uint256 shareAmount = amount.mul(totalShareBalance()).div(_totalTokenBalance());
         
         IMasterChef(dailyMasterChef).withdraw(msg.sender, dailyStakePid, shareAmount);
@@ -99,8 +97,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
         if (amount > localBalance) {
             uint256 withdrawAmount = amount.sub(localBalance);
             _exitSome(withdrawAmount);
-        } else if (!emergencyStop) {
-            _invest();
         }
             
         uint256 withdrawFee = _withdrawFee(amount, lastDepositTimes[msg.sender]);

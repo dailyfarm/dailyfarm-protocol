@@ -98,7 +98,7 @@ contract ThreeEpsVault is BaseVault, TokenConverter {
         
         IEpsStableSwap(epsStableSwap).remove_liquidity_one_coin(feeAmount, 0, 1);
         _swap(busd, dailyToken, IERC20(busd).balanceOf(address(this)), feeReceiver);
-        
+        return feeAmount;
     }
 
     function _totalTokenBalance() internal view override returns (uint256) {

@@ -120,7 +120,7 @@ contract PancakeLpVault is BaseVault, TokenConverter {
 
         _swap(toToken, fromToken, IERC20(toToken).balanceOf(address(this)), address(this));
         _swap(fromToken, dailyToken, IERC20(fromToken).balanceOf(address(this)), feeReceiver);
-
+        return feeAmount;
     }
 
     function _totalTokenBalance() internal view override returns (uint256) {
