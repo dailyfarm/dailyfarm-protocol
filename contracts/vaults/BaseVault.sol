@@ -39,7 +39,7 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
     }
 
     modifier onlyEmergencyOperator {
-        require (msg.sender == emergencyOperator, "on operator");
+        require (msg.sender == emergencyOperator, "no operator");
 
         _;
     }

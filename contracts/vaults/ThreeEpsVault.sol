@@ -1,6 +1,5 @@
 pragma solidity ^0.6.0;
 
-import "../interfaces/IMasterChef.sol";
 import "./BaseVault.sol";
 import "../utils/TokenConverter.sol";
 
