@@ -223,7 +223,9 @@ contract MasterChef is Ownable {
                 getRewardRate(pool.lastRewardTimestamp, block.timestamp).mul(pool.allocPoint).div(
                     totalAllocPoint
                 );
-        IMinter(address(reward)).mint(address(this), rewardReward);
+        if (rewardReward > 0) {
+            IMinter(address(reward)).mint(address(this), rewardReward);
+        }
         devBal = devBal.add(rewardReward.mul(DEV_FUND_RATE).div(100));
         opBal = opBal.add(rewardReward.mul(OP_FUND_RATE).div(100));
         pool.accRewardPerShare = pool.accRewardPerShare.add(
