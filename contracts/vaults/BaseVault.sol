@@ -117,21 +117,6 @@ abstract contract BaseVault is IVault, ERC20, Ownable {
         emergencyOperator = _op; 
     }
 
-    function emergencyExecute(
-        address target, 
-        bytes memory data, 
-        uint256 value
-    ) public onlyOwner returns (bytes memory) {
-        (bool success, bytes memory returnData) = target.call{value: value}(
-            data
-        );
-        require(
-            success,
-            'BaseVault: Transaction execution reverted.'
-        );
-        return returnData;
-    }
-
     // ============  EMERGENCY GOV =======================
 
     function stop() public virtual onlyEmergencyOperator {

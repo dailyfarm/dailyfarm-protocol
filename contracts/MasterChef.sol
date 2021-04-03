@@ -68,9 +68,9 @@ contract MasterChef is Ownable {
     address public pointManager;
 
     // reward rate
-    uint256 curRewardRate;
-    uint256 nextRewardRate;
-    uint256 nextRewardRateTimestamp;
+    uint256 public curRewardRate;
+    uint256 public nextRewardRate;
+    uint256 public nextRewardRateTimestamp;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
