@@ -32,8 +32,8 @@ contract ThreeEpsVault is BaseVault, TokenConverter {
     ) 
         public 
         BaseVault(
-            "daily Eps_Wbnb_Lp",
-            "d_EPS_WBNB_LP",
+            "daily 3Eps_Wbnb_Lp",
+            "d_3EPS_WBNB_LP",
             lpToken,
             _dailyMasterChef
         )
