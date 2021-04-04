@@ -67,11 +67,19 @@ contract ThreeEpsVault is BaseVault, TokenConverter {
             
             uint256 wbnbAmount = IERC20(wbnb).balanceOf(address(this));            
             _swap(wbnb, busd, wbnbAmount, address(this));
-            
-            uint256[] memory inAmounts = new uint256[](3);
-            inAmounts[0] = IERC20(busd).balanceOf(address(this));
-            IEpsStableSwap(epsStableSwap).add_liquidity(inAmounts, 1);
-            
+
+            (bool success, bytes memory returnData) = epsStableSwap.call{value: 0}(
+                abi.encodePacked(
+                    bytes4(0x4515cef3),
+                    abi.encode(
+                        IERC20(busd).balanceOf(address(this)),
+                        IERC20(usdc).balanceOf(address(this)),
+                        IERC20(usdt).balanceOf(address(this)), 
+                        uint256(1)
+                    )
+                )
+            );
+            require(success, "3eps add lp error");
         }
     }
 
@@ -117,8 +125,7 @@ interface IEpsMasterChef {
 }
 
 interface IEpsStableSwap {
-    function add_liquidity(uint256[] calldata _amounts, uint256 _min_mint_amount) external;
-    function remove_liquidity(uint256 _amount, uint256[] calldata _min_amount) external;
+    function add_liquidity(uint256 _amount0, uint256 _amount1, uint256 _amount2, uint256 _min_mint_amount) external;
     function remove_liquidity_one_coin(uint256 _amount, int128 i, uint256 _min_amount) external;
 }
 
