@@ -19,6 +19,7 @@ contract ThreeEpsVault is BaseVault, TokenConverter {
 
     address public constant epsMasterChef = 0xcce949De564fE60e7f96C85e55177F8B9E4CF61b;
     uint256 public constant epsMasterChefPid = 1;
+    address public constant epsRewardMinter = 0x4076CC26EFeE47825917D0feC3A79d0bB9a6bB5c;
 
     address public constant pancakeFactory = 0xBCfCcbde45cE874adCB698cC183deBcF17952812;
     
@@ -52,6 +53,7 @@ contract ThreeEpsVault is BaseVault, TokenConverter {
         (uint256 stakeAmount, ) = IEpsMasterChef(epsMasterChef).userInfo(epsMasterChefPid, address(this));
         if (stakeAmount > 0) {
             IEpsMasterChef(epsMasterChef).withdraw(epsMasterChefPid, 0);
+            try IEpsRewardMinter(epsRewardMinter).exit() {} catch {}
         }
         uint256 epsAmount = IERC20(eps).balanceOf(address(this));
         if (epsAmount > 0) {
@@ -118,4 +120,9 @@ interface IEpsStableSwap {
     function add_liquidity(uint256[] calldata _amounts, uint256 _min_mint_amount) external;
     function remove_liquidity(uint256 _amount, uint256[] calldata _min_amount) external;
     function remove_liquidity_one_coin(uint256 _amount, int128 i, uint256 _min_amount) external;
+}
+
+interface IEpsRewardMinter {
+    function withdraw(uint256 _amount) external;
+    function exit() external;
 }

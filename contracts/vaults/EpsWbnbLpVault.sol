@@ -14,6 +14,7 @@ contract EpsWbnbLpVault is BaseVault, TokenConverter {
 
     address public constant epsMasterChef = 0xcce949De564fE60e7f96C85e55177F8B9E4CF61b;
     uint256 public constant epsMasterChefPid = 0;
+    address public constant epsRewardMinter = 0x4076CC26EFeE47825917D0feC3A79d0bB9a6bB5c;
 
     address public constant pancakeFactory = 0xBCfCcbde45cE874adCB698cC183deBcF17952812;
     
@@ -43,6 +44,7 @@ contract EpsWbnbLpVault is BaseVault, TokenConverter {
         (uint256 stakeAmount, ) = IEpsMasterChef(epsMasterChef).userInfo(epsMasterChefPid, address(this));
         if (stakeAmount > 0) {
             IEpsMasterChef(epsMasterChef).withdraw(epsMasterChefPid, 0);
+            try IEpsRewardMinter(epsRewardMinter).exit() {} catch {}
         }
         uint256 epsAmount = IERC20(eps).balanceOf(address(this));
         if (epsAmount > 0) {
@@ -99,4 +101,9 @@ interface IEpsMasterChef {
     function userInfo(uint256 pid, address user) external view returns (uint256, uint256); 
     function deposit(uint256 _pid, uint256 _amount) external;
     function withdraw(uint256 _pid, uint256 _amount) external;
+}
+
+interface IEpsRewardMinter {
+    function withdraw(uint256 _amount) external;
+    function exit() external;
 }
