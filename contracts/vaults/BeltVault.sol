@@ -16,7 +16,7 @@ contract BeltVault is BaseVault, TokenConverter {
 
     address public constant beltMasterChef = 0xD4BbC80b9B102b77B21A06cb77E954049605E6c1;
     uint256 public constant beltMasterChefPid = 0;
-    address public constant  beltVenusPool = 0xf157A4799bE445e3808592eDd7E7f72150a7B050;
+    address public constant beltVenusPool = 0xf157A4799bE445e3808592eDd7E7f72150a7B050;
 
     address public constant pancakeFactory = 0xBCfCcbde45cE874adCB698cC183deBcF17952812;
     
@@ -40,6 +40,7 @@ contract BeltVault is BaseVault, TokenConverter {
         dailyToken = _dailyToken;
         feeReceiver = _feeReceiver;
         IERC20(lpToken).safeApprove(beltMasterChef, 10**60);
+        IERC20(busd).safeApprove(beltVenusPool, 10**16);
     }
 
     function _harvest() internal override {
