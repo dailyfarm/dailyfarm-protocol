@@ -23,6 +23,10 @@ contract BeltVault is BaseVault, TokenConverter {
     address public dailyToken;
     address public feeReceiver;
 
+    uint256 public xRewardRate = 50;
+    uint256 public freePeriod = 2 days;
+    uint256 public exitFeeRate = 2;
+
     constructor(
         address _dailyMasterChef,
         address _dailyToken,
@@ -51,7 +55,7 @@ contract BeltVault is BaseVault, TokenConverter {
         uint256 beltAmount = IERC20(belt).balanceOf(address(this));
         if (beltAmount > 0) {
             // 50% for xDaily stakers
-            uint256 xReward = beltAmount.div(50);
+            uint256 xReward = beltAmount.mul(xRewardRate).div(100);
             _swap(belt, wbnb, xReward, address(this));
             _swap(wbnb, dailyToken, IERC20(wbnb).balanceOf(address(this)), feeReceiver);
 
@@ -90,10 +94,10 @@ contract BeltVault is BaseVault, TokenConverter {
     }
 
     function _withdrawFee(uint256 _withdrawAmount, uint256 _lastDepositTime) internal override returns (uint256) {
-        if (_lastDepositTime.add(2 days) <= block.timestamp) {
+        if (_lastDepositTime.add(freePeriod) <= block.timestamp) {
             return 0;
         } 
-        uint256 feeAmount = _withdrawAmount.mul(2).div(1000);
+        uint256 feeAmount = _withdrawAmount.mul(exitFeeRate).div(1000);
         
         IERC20(lpToken).safeTransfer(lpToken, feeAmount);
         IUniswapV2Pair(lpToken).burn(address(this));
@@ -106,6 +110,21 @@ contract BeltVault is BaseVault, TokenConverter {
     function _totalTokenBalance() internal view override returns (uint256) {
         (uint256 stakeAmount, ) = IBeltMasterChef(beltMasterChef).userInfo(beltMasterChefPid, address(this));
         return IERC20(lpToken).balanceOf(address(this)).add(stakeAmount);
+    }
+
+    function setFreePeriod(uint256 _period) public onlyOwner {
+        require(_period >= 2 days && _period <= 15 days, "invalid period");
+        freePeriod = _period;
+    }
+
+    function setXRewardRate(uint256 _rate) public onlyOwner {
+        require(_rate >= 10 && _rate <= 80, "invalid rate");
+        xRewardRate = _rate;
+    }
+
+    function setExitFeeRate(uint256 _rate) public onlyOwner {
+        require(_rate <= 50, "invalid");
+        exitFeeRate = _rate;
     }
     
 }
