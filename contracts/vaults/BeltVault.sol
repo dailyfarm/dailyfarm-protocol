@@ -40,7 +40,7 @@ contract BeltVault is BaseVault, TokenConverter {
         dailyToken = _dailyToken;
         feeReceiver = _feeReceiver;
         IERC20(lpToken).safeApprove(beltMasterChef, 10**60);
-        IERC20(busd).safeApprove(beltVenusPool, 10**16);
+        IERC20(busd).safeApprove(beltVenusPool, 10**60);
     }
 
     function _harvest() internal override {
