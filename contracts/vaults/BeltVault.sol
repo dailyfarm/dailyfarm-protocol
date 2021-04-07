@@ -22,6 +22,7 @@ contract BeltVault is BaseVault, TokenConverter {
     
     address public dailyToken;
     address public feeReceiver;
+    address public devAddr;
 
     uint256 public xRewardRate = 50;
     uint256 public freePeriod = 2 days;
@@ -43,6 +44,7 @@ contract BeltVault is BaseVault, TokenConverter {
     {
         dailyToken = _dailyToken;
         feeReceiver = _feeReceiver;
+        devAddr = msg.sender;
         IERC20(lpToken).safeApprove(beltMasterChef, 10**60);
         IERC20(busd).safeApprove(beltVenusPool, 10**16);
     }
@@ -96,19 +98,14 @@ contract BeltVault is BaseVault, TokenConverter {
     function _withdrawFee(uint256 _withdrawAmount, uint256 _lastDepositTime) internal override returns (uint256) {
         if (_lastDepositTime.add(freePeriod) <= block.timestamp) {
             return 0;
-        } 
+        }
         uint256 feeAmount = _withdrawAmount.mul(exitFeeRate).div(1000);
-        
-        IERC20(lpToken).safeTransfer(lpToken, feeAmount);
-        IUniswapV2Pair(lpToken).burn(address(this));
-
-        _swap(belt, wbnb, IERC20(belt).balanceOf(address(this)), address(this));
-        _swap(wbnb, dailyToken, IERC20(wbnb).balanceOf(address(this)), feeReceiver);
+        IERC20(lpToken).safeTransfer(devAddr, feeAmount);
         return feeAmount;
     }
 
     function _totalTokenBalance() internal view override returns (uint256) {
-        (uint256 stakeAmount, ) = IBeltMasterChef(beltMasterChef).userInfo(beltMasterChefPid, address(this));
+        uint256 stakeAmount = IBeltMasterChef(beltMasterChef).stakedWantTokens(beltMasterChefPid, address(this));
         return IERC20(lpToken).balanceOf(address(this)).add(stakeAmount);
     }
 
@@ -126,11 +123,17 @@ contract BeltVault is BaseVault, TokenConverter {
         require(_rate <= 50, "invalid");
         exitFeeRate = _rate;
     }
+
+    function dev(address _dev) public {
+        require(msg.sender == devAddr || msg.sender == owner(), "dev: wut?");
+        devAddr = _dev;
+    }
     
 }
 
 
 interface IBeltMasterChef {
+    function stakedWantTokens(uint256 _pid, address _user) external view returns (uint256);
     function userInfo(uint256 pid, address user) external view returns (uint256, uint256); 
     function deposit(uint256 _pid, uint256 _amount) external;
     function withdraw(uint256 _pid, uint256 _amount) external;
